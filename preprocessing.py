@@ -2,7 +2,6 @@ import pandas as pd
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import time
 import random
 
@@ -171,29 +170,7 @@ for dir in os.listdir('data'):
             if label == 'all': # and subject == '1' and sample == '1':
                 idx += 1
                 print('index: ', idx)
-                '''data.loc[idx] = [None,
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set()]'''
+                
                 newDf = pd.read_table('data/' + dir + '/' + fileName,
                                        sep='\t',
                                        header=None,
@@ -238,29 +215,7 @@ while i < 27:
         i += 1
         idx += 1
         print('index: ', idx)
-        '''data.loc[idx] = [None,
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set()]'''
+
         newDf = pd.read_table('data/tctodd' + str(fileNumber) + '/' + fileName,
                               sep='\t',
                               header=None,
@@ -283,51 +238,12 @@ while i < 27:
         data.at[idx, 'class'] = 0
         print("==> %s seconds" % (time.time() - start_time))
 
-
-''' print('incr: ')
-c = 0
-for elem in data.incr_x1:
-    for e in elem:
-        print(e)
-        for i in e:
-            c = c + 1
-    print('\n')
-print('len incr_x1: ', c)
-
-print('decr: ')
-c = 0
-for elem in data.decr_x1:
-    for e in elem:
-        print(e)
-        for i in e:
-            c = c + 1
-    print('\n')
-print('len decr_x1: ', c)
-
-print('stab: ')
-c = 0
-for elem in data.stab_x1:
-    for e in elem:
-        print(e)
-        for i in e:
-            c = c + 1
-    print('\n')
-print('len stab_x1: ', c) '''
-
-''' print('print the entire data: ')
-print(data.to_string(index=False))
-print('\n\n')
-
-print('print each value for each column:')
-for attr in data.columns.values:
-    print(data[attr])
-print('\n\n') '''
-
-print('print data.info()')
 print(data.info())
 
-print(data.stab_x1)
-
+# save data to pickle (i.e., raw binary file)
 data.to_pickle('dataset a=' + str(alpha) + ' b= ' + str(beta) + '.pkl')
+# save data to csv (i.e., comma separated file)
 data.to_csv('dataset a=' + str(alpha) + ' b= ' + str(beta) + '.csv')
+
+# print the needed time to compute all the preprocessing
 print("--- %s seconds ---" % (time.time() - start_time))
