@@ -89,6 +89,8 @@ def getIntervals(serie, std):
                     elif count == 0:
                         hashmap['stab'].add((i, j))
 
+    # a trick to insert a set into a cell
+    # https://stackoverflow.com/questions/26483254/python-pandas-insert-list-into-a-cell/26510251
     df = pd.DataFrame({'incr': set(),
                        'decr': set(),
                        'stab': set()})
