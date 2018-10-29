@@ -170,29 +170,7 @@ for dir in os.listdir('data'):
             if label == 'all': # and subject == '1' and sample == '1':
                 idx += 1
                 print('index: ', idx)
-                '''data.loc[idx] = [None,
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set(),
-                                 set(), set(), set()]'''
+                
                 newDf = pd.read_table('data/' + dir + '/' + fileName,
                                        sep='\t',
                                        header=None,
@@ -237,29 +215,7 @@ while i < 27:
         i += 1
         idx += 1
         print('index: ', idx)
-        '''data.loc[idx] = [None,
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set(),
-                         set(), set(), set()]'''
+
         newDf = pd.read_table('data/tctodd' + str(fileNumber) + '/' + fileName,
                               sep='\t',
                               header=None,
