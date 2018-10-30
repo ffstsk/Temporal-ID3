@@ -1,14 +1,17 @@
 import pandas as pd
 import numpy as np
 
-data = pd.DataFrame({'class': None, 'fever': set(), 'head': set()})
+#intervalRelations = ['L', 'L_', 'A', 'A_', 'O', 'O_', 'E', 'E_', 'D', 'D_', 'B', 'B_']
+intervalRelations = ['L', 'O']
+data = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
 data.astype(object)
-data.loc[0] = ['C1', {(3,6)}, {(4,9)}]
-data.loc[1] = ['C1', {(2,5)}, {(3,6)}]
-data.loc[2] = ['C2', {(1,5)}, {(6,8)}]
-data.loc[3] = ['C2', {}, {(5,7)}]
+data.loc[0] = ['C1', {(3,6)}, {(4,9)}, (-1, 0)]
+data.loc[1] = ['C1', {(2,5)}, {(3,6)}, (-1, 0)]
+data.loc[2] = ['C2', {(1,5)}, {(6,8)}, (-1, 0)]
+data.loc[3] = ['C2', {}, {(5,7)}, (-1, 0)]
 
 print(data)
+print('\n\n\n')
 
 # get all the unique values for a column in a dataset
 def uniqueValues(dataset, column):
@@ -126,25 +129,23 @@ class Question:
     # 'operator': HS interval temporal relation
     # 'interval': considered world (i.e., an interval)
     # 'value'   : for categorical or numerical attributes
-    def __init__(self, column=None, operator=None, interval=None, value=None):
-        self.column = column
+    def __init__(self, column=None, operator=None):
+        self.literal = column
         self.operator = operator
-        self.interval = interval
-        self.value = value
 
-    def match(self, example):
-        intervals = example[self.column]
+    def match(self, currentInterval, example):
+        intervals = example[self.literal]
         for interval in intervals:
-            if self.operator.check(self.interval, interval):
-                return True
-        # TODO if we omit this control we could have 'None' as returned value
-        return False
+            if self.operator.check(currentInterval, interval):
+                return True, interval
+        # TODO if we omit this control we could have 'None' as returned value, think about it
+        return False, None
 
     def __repr__(self):
         # TODO treat the cases for categorial and numerical attributes
-        if isinstance(self.interval, tuple) and self.interval != None:
-            return "The timeline on interval [%s, %s] satisfies <%s>%s ?" % (
-                str(self.interval[0]), str(self.interval[1]), self.operator, self.column)
+        if self.operator != None:
+            return "The timeline satisfies <%s>%s ?" % (
+                self.operator, self.literal)
 
 # op = Operator('B_')
 # q = Question('fever', op, (3, 8))
@@ -152,17 +153,26 @@ class Question:
 # print(q.match(data.iloc[0]))
 
 def partition(dataset, question):
-    trueRows = pd.DataFrame({'class': None, 'fever': set(), 'head': set()})
-    falseRows = pd.DataFrame({'class': None, 'fever': set(), 'head': set()})
+    trueRows = pd.DataFrame({'class': None,'fever': set(), 'head': set(), 'interval': None})
+    falseRows = pd.DataFrame({'class': None, 'fever': set(), 'head': set(), 'interval': None})
     trueRows.astype(object)
     trueRows.astype(object)
 
+    # for each row in the current fragment of the training set
     for row in range(0, dataset.shape[0]):
-        if question.match(dataset.loc[row]):
+        # make the question, if the answer is positive then there exist an interval ('existsInterval' is True)
+        # and the interval is 'interval'
+        existsInterval, interval = question.match(dataset.iloc[row]['interval'], dataset.loc[row])
+        if existsInterval:
+            # dataset.loc[row]['interval'] = interval
             if trueRows.index.empty:
-                trueRows.at[0] = dataset.loc[row]
+                observation = dataset.loc[row].copy()
+                observation['interval'] = interval
+                trueRows.at[0] = observation
             else:
-                trueRows.at[trueRows.index[-1] + 1] = dataset.loc[row]
+                observation = dataset.loc[row].copy()
+                observation['interval'] = interval
+                trueRows.at[trueRows.index[-1] + 1] = observation
         else:
             if falseRows.index.empty:
                 falseRows.at[0] = dataset.loc[row]
@@ -170,15 +180,15 @@ def partition(dataset, question):
                 falseRows.at[falseRows.index[-1] + 1] = dataset.loc[row]
     return trueRows, falseRows
 
-op = Operator('L')
-q = Question('fever', op, (-1,0))
+'''op = Operator('L')
+q = Question('fever', op)
 print(q)
 trueRows, falseRows = partition(data, q)
-print('true rows:')
+print('true rows:', trueRows.shape[0])
 print(trueRows)
-print('false rows:')
+print('false rows:', falseRows.shape[0])
 print(falseRows)
-print('\n\n')
+print('\n\n') '''
 
 def entropy(dataset):
     counts = countClassElements(dataset)
@@ -186,42 +196,114 @@ def entropy(dataset):
     for label in counts:
         probability = counts[label] / dataset.shape[0]
         information += - probability * np.log2(probability)
-    return information
+    return round(information, 4)
 
 def temporalInformation(dataset, q):
     trueRows, falseRows = partition(dataset, q)
-    return trueRows.shape[0]/dataset.shape[0] * entropy(trueRows) + \
-           falseRows.shape[0]/dataset.shape[0] * entropy(falseRows)
+    # TODO necessary?
+    if len(trueRows) == 0 or len(falseRows) == 0:
+        return 0
+    #print('>>> trueRows:', trueRows.shape[0])
+    #print(trueRows)
+    #print('>>> falseRows:', falseRows.shape[0])
+    #print(falseRows)
+    return round(trueRows.shape[0]/dataset.shape[0] * entropy(trueRows) +
+                 falseRows.shape[0]/dataset.shape[0] * entropy(falseRows), 4)
 
+'''op = Operator('L')
+q = Question('fever', op)
 print(q)
-print('entropy of data:', entropy(data))
-print('entropy of trueRows:', entropy(trueRows))
-print('entropy of falseRows:', entropy(falseRows))
-print('temporal information of data:', temporalInformation(data, q))
-print('information gain data:', entropy(data) - temporalInformation(data, q))
+information = entropy(data)
+tempInfo = temporalInformation(data, q)
 print('\n')
+print('entropy of data:', information)
+print('temporal information of data:', tempInfo)
+print('information gain data:', round(information - tempInfo, 4))
+print('\n\n\n')
 
 op = Operator('O')
-q2 = Question('head', op, (2, 5))
-trueRows2, falseRows2 = partition(trueRows, q2)
-print('trueRows2:')
-print(trueRows2)
-print('falseRows2:')
-print(falseRows2)
+q2 = Question('head', op)
 print(q2)
-print('entropy of trueRows:', entropy(trueRows))
-print('entropy of trueRows2:', entropy(trueRows2))
-print('entropy of falseRows2:', entropy(falseRows2))
-print('temporal information of trueRows:', temporalInformation(trueRows, q2))
-print('information gain trueRows:', entropy(trueRows) - temporalInformation(trueRows, q2))
+trueRows = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
+trueRows.astype(object)
+trueRows.loc[0] = ['C1', {(3,6)}, {(4,9)}, (3, 6)]
+trueRows.loc[1] = ['C1', {(2,5)}, {(3,6)}, (2, 5)]
+trueRows.loc[2] = ['C2', {(1,5)}, {(6,8)}, (1, 5)]
+information = entropy(trueRows)
+tempInfo = temporalInformation(trueRows, q2)
+print('entropy of trueRows:', information)
+print('temporal information of trueRows:', tempInfo)
+print('information gain trueRows:', information - tempInfo) '''
+
+def findBestSplit(dataset):
+    bestGain = 0
+    bestQuestion = None
+
+    for column in ['fever', 'head']:
+        for relation in intervalRelations:
+            question = Question(column, Operator(relation))
+            #trueRows, falseRows = partition(dataset, question)
+            '''print('###################')
+            print('>>> <%s>%s' % (relation, column))
+            print('>>> data before:')
+            print(dataset)'''
+            gain = temporalInformation(dataset, question)
+            '''print('>>> data after:')
+            print(dataset)
+            print('###################\n\n\n')'''
+            if gain >= bestGain:
+                bestGain, bestQuestion = gain, question
+
+    return bestGain, bestQuestion
+
+''' bestGain, bestQuestion = findBestSplit(data)
+print('best gain:', bestGain)
+print('best question:', bestQuestion) '''
 
 class Leaf:
     def __init__(self, dataset):
         self.predictions = countClassElements(dataset)
 
 class Node:
-    def __init__(self, leftBranch, rightBranch, anchor, question):
+    def __init__(self, leftBranch, rightBranch, anchored, question):
         self.leftBranch = leftBranch
         self.rightBranch = rightBranch
-        self.anchor = anchor
+        self.anchored = anchored
         self.question = question
+
+def buildTree(dataset, anchored=0):
+    gain, question = findBestSplit(dataset)
+
+    # TODO: better stop criteria
+    #if gain == 0:
+    if len(uniqueValues(dataset, 'class')) == 1:
+        return Leaf(dataset)
+
+    trueRows, falseRows = partition(dataset, question)
+
+    leftBranch = buildTree(trueRows, 1)
+    rightBranch = buildTree(falseRows, 0)
+
+    return Node(leftBranch, rightBranch, anchored, question)
+
+def printTree(node, spacing=""):
+    """World's most elegant tree printing function."""
+
+    # Base case: we've reached a leaf
+    if isinstance(node, Leaf):
+        print (spacing + "Predict", node.predictions)
+        return
+
+    # Print the question at this node
+    print(spacing + str(node.question))
+
+    # Call this function recursively on the true branch
+    print(spacing + '--> True:')
+    printTree(node.leftBranch, spacing + "\t")
+
+    # Call this function recursively on the false branch
+    print(spacing + '--> False:')
+    printTree(node.rightBranch, spacing + "\t")
+
+temporalTree = buildTree(data, 0)
+printTree(temporalTree)
