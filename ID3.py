@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 
-#intervalRelations = ['L', 'L_', 'A', 'A_', 'O', 'O_', 'E', 'E_', 'D', 'D_', 'B', 'B_']
-intervalRelations = ['L', 'O']
+intervalRelations = ['L', 'L_', 'A', 'A_', 'O', 'O_', 'E', 'E_', 'D', 'D_', 'B', 'B_']
+#intervalRelations = ['L', 'O']
 data = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
 data.astype(object)
 data.loc[0] = ['C1', {(3,6)}, {(4,9)}, (-1, 0)]
@@ -133,7 +133,8 @@ class Question:
         self.literal = column
         self.operator = operator
 
-    def match(self, currentInterval, example):
+    def match(self, example):
+        currentInterval = example['interval']
         intervals = example[self.literal]
         for interval in intervals:
             if self.operator.check(currentInterval, interval):
@@ -162,7 +163,7 @@ def partition(dataset, question):
     for row in range(0, dataset.shape[0]):
         # make the question, if the answer is positive then there exist an interval ('existsInterval' is True)
         # and the interval is 'interval'
-        existsInterval, interval = question.match(dataset.iloc[row]['interval'], dataset.loc[row])
+        existsInterval, interval = question.match(dataset.loc[row])
         if existsInterval:
             # dataset.loc[row]['interval'] = interval
             if trueRows.index.empty:
@@ -194,21 +195,24 @@ def entropy(dataset):
     counts = countClassElements(dataset)
     information = 0
     for label in counts:
-        probability = counts[label] / dataset.shape[0]
+        probability = counts[label] / len(dataset)
         information += - probability * np.log2(probability)
     return round(information, 4)
 
-def temporalInformation(dataset, q):
+def temporalInformationGain(dataset, q):
     trueRows, falseRows = partition(dataset, q)
     # TODO necessary?
     if len(trueRows) == 0 or len(falseRows) == 0:
         return 0
-    #print('>>> trueRows:', trueRows.shape[0])
-    #print(trueRows)
-    #print('>>> falseRows:', falseRows.shape[0])
-    #print(falseRows)
-    return round(trueRows.shape[0]/dataset.shape[0] * entropy(trueRows) +
-                 falseRows.shape[0]/dataset.shape[0] * entropy(falseRows), 4)
+    ''' print('>>>>> trueRows:', trueRows.shape[0])
+    print(trueRows)
+    print('>>>>> entropy trueRows:', entropy(trueRows))
+    print('>>>>> falseRows:', falseRows.shape[0])
+    print(falseRows)
+    print('>>>>> entropy falseRows:', entropy(falseRows)) '''
+    return round(entropy(dataset) -
+                 len(trueRows)/len(dataset) * entropy(trueRows) +
+                 len(falseRows)/len(dataset) * entropy(falseRows), 4)
 
 '''op = Operator('L')
 q = Question('fever', op)
@@ -242,19 +246,23 @@ def findBestSplit(dataset):
     for column in ['fever', 'head']:
         for relation in intervalRelations:
             question = Question(column, Operator(relation))
-            #trueRows, falseRows = partition(dataset, question)
-            '''print('###################')
-            print('>>> <%s>%s' % (relation, column))
-            print('>>> data before:')
-            print(dataset)'''
-            gain = temporalInformation(dataset, question)
-            '''print('>>> data after:')
-            print(dataset)
-            print('###################\n\n\n')'''
+            # trueRows, falseRows = partition(dataset, question)
+            # print('###################')
+            # print('>>> Splitting with <%s>%s' % (relation, column), end='')
+            # print('>>> data:')
+            # print(dataset)
+            gain = temporalInformationGain(dataset, question)
+            # print('\t will result a', gain, 'gain')
+            # print('>>> data after:')
+            # print(dataset)
+            # print('###################\n\n\n')
             if gain >= bestGain:
                 bestGain, bestQuestion = gain, question
 
     return bestGain, bestQuestion
+
+def findBestInterval(dataset):
+    return None
 
 ''' bestGain, bestQuestion = findBestSplit(data)
 print('best gain:', bestGain)
@@ -265,18 +273,23 @@ class Leaf:
         self.predictions = countClassElements(dataset)
 
 class Node:
-    def __init__(self, leftBranch, rightBranch, anchored, question):
+    def __init__(self, leftBranch=None, rightBranch=None, anchored=None, question=None, interval=None):
         self.leftBranch = leftBranch
         self.rightBranch = rightBranch
         self.anchored = anchored
         self.question = question
+        self.interval = interval
 
 def buildTree(dataset, anchored=0):
+    # TODO: find best interval for an non-archored node
+    interval = None
+    if anchored == 0:
+        interval = findBestInterval(dataset)
+
     gain, question = findBestSplit(dataset)
 
-    # TODO: better stop criteria
-    #if gain == 0:
-    if len(uniqueValues(dataset, 'class')) == 1:
+    # stop criteria
+    if gain == 0 or len(uniqueValues(dataset, 'class')) == 1:
         return Leaf(dataset)
 
     trueRows, falseRows = partition(dataset, question)
@@ -284,26 +297,52 @@ def buildTree(dataset, anchored=0):
     leftBranch = buildTree(trueRows, 1)
     rightBranch = buildTree(falseRows, 0)
 
-    return Node(leftBranch, rightBranch, anchored, question)
+    return Node(leftBranch, rightBranch, anchored, question, interval)
 
 def printTree(node, spacing=""):
-    """World's most elegant tree printing function."""
-
-    # Base case: we've reached a leaf
+    # base case: we've reached a Leaf
     if isinstance(node, Leaf):
         print (spacing + "Predict", node.predictions)
         return
 
-    # Print the question at this node
+    # print the question at this node
     print(spacing + str(node.question))
 
-    # Call this function recursively on the true branch
+    # call this function recursively on the true branch
     print(spacing + '--> True:')
     printTree(node.leftBranch, spacing + "\t")
 
-    # Call this function recursively on the false branch
+    # call this function recursively on the false branch
     print(spacing + '--> False:')
     printTree(node.rightBranch, spacing + "\t")
 
 temporalTree = buildTree(data, 0)
 printTree(temporalTree)
+
+def classify(instance, node):
+    # TODO: take care of the current interval that 'leads' the computation
+    if isinstance(node, Leaf):
+        return node.predictions
+    matches, interval = node.question.match(instance)
+    print(node.question, matches)
+    print(instance['interval'], instance['head'])
+    print(instance)
+    print('\n\n\n')
+    if matches:
+        return classify(instance, node.leftBranch)
+    else:
+        return classify(instance, node.rightBranch)
+
+def printLeaf(counts):
+    total = sum(counts.values()) * 1.0
+    probs = {}
+    for label in counts.keys():
+        probs[label] = str(int(counts[label] / total * 100)) + "%"
+    return probs
+
+test = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
+test.astype(object)
+test.loc[0] = ['C1', {(4, 5)}, {}, (-1, 0)]
+#print(data.iloc[3])
+
+print(printLeaf(classify(data.loc[0], temporalTree)))
