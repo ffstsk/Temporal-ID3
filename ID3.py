@@ -1,14 +1,20 @@
 import pandas as pd
 import numpy as np
 
+# TODO: file configurazione
+# TODO: file output come weka
+# TODO: file output con l'albero
+
 intervalRelations = ['L', 'L_', 'A', 'A_', 'O', 'O_', 'E', 'E_', 'D', 'D_', 'B', 'B_']
 #intervalRelations = ['L', 'O']
 data = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
 data.astype(object)
-data.loc[0] = ['C1', {(3,6)}, {(4,9)}, (-1, 0)]
-data.loc[1] = ['C1', {(2,5)}, {(3,6)}, (-1, 0)]
-data.loc[2] = ['C2', {(1,5)}, {(6,8)}, (-1, 0)]
-data.loc[3] = ['C2', {}, {(5,7)}, (-1, 0)]
+data.loc[0] = ['C1', {(3, 6)}, {(4, 9)}, (-1, 0)]
+data.loc[1] = ['C1', {(2, 5)}, {(3, 6)}, (-1, 0)]
+data.loc[2] = ['C2', {(1, 5)}, {(6, 8)}, (-1, 0)]
+data.loc[3] = ['C2', {}, {(5, 7)}, (-1, 0)]
+data.loc[4] = ['C3', {(1, 2), (5, 10)}, {(5, 7)}, (-1, 0)]
+data.loc[5] = ['C3', {(3, 8), (6, 9)}, {(1, 2), (4, 7), (5, 8)}, (-1, 0)]
 
 print(data)
 print('\n\n\n')
@@ -129,12 +135,16 @@ class Question:
     # 'operator': HS interval temporal relation
     # 'interval': considered world (i.e., an interval)
     # 'value'   : for categorical or numerical attributes
-    def __init__(self, column=None, operator=None):
+    def __init__(self, column=None, operator=None, interval=None):
         self.literal = column
         self.operator = operator
+        self.interval = interval
 
     def match(self, example):
-        currentInterval = example['interval']
+        if self.interval == None:
+            currentInterval = example['interval']
+        else:
+            currentInterval = self.interval
         intervals = example[self.literal]
         for interval in intervals:
             if self.operator.check(currentInterval, interval):
@@ -144,7 +154,7 @@ class Question:
 
     def __repr__(self):
         # TODO treat the cases for categorial and numerical attributes
-        if self.operator != None:
+        if isinstance(self.operator, Operator):
             return "The timeline satisfies <%s>%s ?" % (
                 self.operator, self.literal)
 
@@ -165,7 +175,6 @@ def partition(dataset, question):
         # and the interval is 'interval'
         existsInterval, interval = question.match(dataset.loc[row])
         if existsInterval:
-            # dataset.loc[row]['interval'] = interval
             if trueRows.index.empty:
                 observation = dataset.loc[row].copy()
                 observation['interval'] = interval
@@ -201,7 +210,8 @@ def entropy(dataset):
 
 def temporalInformationGain(dataset, q):
     trueRows, falseRows = partition(dataset, q)
-    # TODO necessary?
+    # if the true rows or the false ones are 0, then it is necessary to return 0 as gain
+    # otherwise a 'ZeroDivisionError' will raise
     if len(trueRows) == 0 or len(falseRows) == 0:
         return 0
     ''' print('>>>>> trueRows:', trueRows.shape[0])
@@ -210,6 +220,7 @@ def temporalInformationGain(dataset, q):
     print('>>>>> falseRows:', falseRows.shape[0])
     print(falseRows)
     print('>>>>> entropy falseRows:', entropy(falseRows)) '''
+
     return round(entropy(dataset) -
                  len(trueRows)/len(dataset) * entropy(trueRows) +
                  len(falseRows)/len(dataset) * entropy(falseRows), 4)
@@ -273,12 +284,11 @@ class Leaf:
         self.predictions = countClassElements(dataset)
 
 class Node:
-    def __init__(self, leftBranch=None, rightBranch=None, anchored=None, question=None, interval=None):
+    def __init__(self, leftBranch=None, rightBranch=None, anchored=None, question=None):
         self.leftBranch = leftBranch
         self.rightBranch = rightBranch
         self.anchored = anchored
         self.question = question
-        self.interval = interval
 
 def buildTree(dataset, anchored=0):
     # TODO: find best interval for an non-archored node
@@ -288,7 +298,7 @@ def buildTree(dataset, anchored=0):
 
     gain, question = findBestSplit(dataset)
 
-    # stop criteria
+    # TODO: gain < k, purity > k', |TS| < k'' (percentuale del dataset originale, prima domanda), l'ordine è da k'', k', k
     if gain == 0 or len(uniqueValues(dataset, 'class')) == 1:
         return Leaf(dataset)
 
@@ -297,9 +307,9 @@ def buildTree(dataset, anchored=0):
     leftBranch = buildTree(trueRows, 1)
     rightBranch = buildTree(falseRows, 0)
 
-    return Node(leftBranch, rightBranch, anchored, question, interval)
+    return Node(leftBranch, rightBranch, anchored, question)
 
-def printTree(node, spacing=""):
+def printTree(node, spacing=''):
     # base case: we've reached a Leaf
     if isinstance(node, Leaf):
         print (spacing + "Predict", node.predictions)
@@ -320,14 +330,14 @@ temporalTree = buildTree(data, 0)
 printTree(temporalTree)
 
 def classify(instance, node):
-    # TODO: take care of the current interval that 'leads' the computation
     if isinstance(node, Leaf):
         return node.predictions
     matches, interval = node.question.match(instance)
     print(node.question, matches)
-    print(instance['interval'], instance['head'])
-    print(instance)
+    print(instance['interval'], interval)
+    # print(instance)
     print('\n\n\n')
+    instance['interval'] = interval
     if matches:
         return classify(instance, node.leftBranch)
     else:
@@ -342,7 +352,7 @@ def printLeaf(counts):
 
 test = pd.DataFrame({'class': None, 'interval': None, 'fever': set(), 'head': set()})
 test.astype(object)
-test.loc[0] = ['C1', {(4, 5)}, {}, (-1, 0)]
+test.loc[0] = ['C1', {}, {(3, 7)}, (-1, 0)]
 #print(data.iloc[3])
 
-print(printLeaf(classify(data.loc[0], temporalTree)))
+print(printLeaf(classify(test.loc[0], temporalTree)))
