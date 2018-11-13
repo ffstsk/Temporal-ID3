@@ -1,9 +1,21 @@
 import pandas as pd
 import numpy as np
+import operator # https://stackoverflow.com/questions/268272/getting-key-with-maximum-value-in-dictionary
 
 # TODO: file configurazione
 # TODO: file output come weka
 # TODO: file output con l'albero
+# TODO: gain < k, purity > k', |TS| < k'' (percentuale del dataset originale, prima domanda), l'ordine è da k'', k', k
+
+
+# stop criteria
+# the priority are like the followings:
+#   1) stopPOD: percent of the original dataset
+#   2) stopPurity: purity degree
+#   3) stopGain: gain less than
+stopPOD = 0.25
+stopPurity = 0.7
+stopGain = 0.05
 
 intervalRelations = ['L', 'L_', 'A', 'A_', 'O', 'O_', 'E', 'E_', 'D', 'D_', 'B', 'B_']
 #intervalRelations = ['L', 'O']
@@ -13,10 +25,15 @@ data.loc[0] = ['C1', {(3, 6)}, {(4, 9)}, (-1, 0)]
 data.loc[1] = ['C1', {(2, 5)}, {(3, 6)}, (-1, 0)]
 data.loc[2] = ['C2', {(1, 5)}, {(6, 8)}, (-1, 0)]
 data.loc[3] = ['C2', {}, {(5, 7)}, (-1, 0)]
-data.loc[4] = ['C3', {(1, 2), (5, 10)}, {(5, 7)}, (-1, 0)]
-data.loc[5] = ['C3', {(3, 8), (6, 9)}, {(1, 2), (4, 7), (5, 8)}, (-1, 0)]
+#data.loc[4] = ['C3', {(1, 2), (5, 10)}, {(5, 7)}, (-1, 0)]
+#data.loc[5] = ['C3', {(3, 8), (6, 9)}, {(1, 2), (4, 7), (5, 8)}, (-1, 0)]
 
 print(data)
+print(data.shape)
+print(len(data))
+
+# the percentual representing the fraction of the original dataset to use as stop criterium
+stopPOD = int(stopPOD * data.shape[0])
 print('\n\n\n')
 
 # get all the unique values for a column in a dataset
@@ -34,7 +51,11 @@ def countClassElements(dataset):
         counts[label] += 1
     return counts
 
-# print(countClassElements(data))
+def classWithMostElements(dictionary):
+    return max(dictionary.items(), key=operator.itemgetter(1))[0]
+
+classElements = countClassElements(data)
+print(classWithMostElements(classElements))
 
 class Operator:
     def __init__(self, operator):
@@ -298,9 +319,26 @@ def buildTree(dataset, anchored=0):
 
     gain, question = findBestSplit(dataset)
 
-    # TODO: gain < k, purity > k', |TS| < k'' (percentuale del dataset originale, prima domanda), l'ordine è da k'', k', k
-    if gain == 0 or len(uniqueValues(dataset, 'class')) == 1:
+    #if gain == 0 or len(uniqueValues(dataset, 'class')) == 1:
+    #    return Leaf(dataset)
+    #print('length:', len(dataset))
+
+    # stop criteria
+    # 1) if the dimension of the current dataset is less than stopPOD, then stop
+    if len(dataset) <= stopPOD:
         return Leaf(dataset)
+    else:
+        # count the elements for each class
+        classElements = countClassElements(dataset)
+        # the class with the highest value
+        cls = classWithMostElements(classElements)
+        # 2) if stopPurity is less than the percent of the highest class, then stop
+        if stopPurity <= classElements[cls]/len(dataset):
+            return Leaf(dataset)
+        else:
+            # 3) if gain is less than stopGain, then stop
+            if gain <= stopGain:
+                return Leaf(dataset)
 
     trueRows, falseRows = partition(dataset, question)
 
